@@ -1,0 +1,336 @@
+// 30 synthetic, hand-labeled evaluation cases for RightRoute.
+// Labels follow the clinic routing standard:
+//   routine non-controlled refill -> pharmacy; controlled refill -> physician
+//   scheduling / records copies / general admin -> front_desk
+//   billing & insurance -> billing
+//   FMLA/disability forms needing clinical input, referrals, routine lab questions -> ma
+//   lab questions needing interpretation or treatment change -> physician
+//   new/worsening symptoms and vague messages -> triage_rn
+//   emergency red flags -> expectEmergency true, expectedRoles ['triage_rn']
+// All content is fabricated; no real people.
+
+import type { EvalCase } from './domain'
+
+export const EVAL_SET: EvalCase[] = [
+  // ---------------------------------------------------------- emergencies (6)
+  {
+    key: 'e01',
+    patientId: 'P12',
+    portalType: 'medical_question',
+    subject: 'weird chest thing',
+    body: "For the last half hour there's a squeezing feeling in the middle of my chest that goes up into my jaw. I'm sweaty and kind of short of breath just sitting here. Probably heartburn but wanted to ask.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: true,
+    note: 'Chest squeezing radiating to jaw with diaphoresis and dyspnea is a possible ACS red flag; emergency escalation regardless of the heartburn framing.',
+  },
+  {
+    key: 'e02',
+    patientId: 'P14',
+    portalType: 'medical_question',
+    subject: 'Theo breathing hard',
+    body: "Theo is breathing really fast and I can see the skin pulling in between his ribs. We gave the inhaler 3 times and it's not helping, he can't really talk. What do we do?",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: true,
+    note: 'Child in respiratory distress (retractions, unable to speak) unresponsive to albuterol is a breathing emergency.',
+  },
+  {
+    key: 'e03',
+    patientId: 'P08',
+    portalType: 'medical_question',
+    subject: 'Hank this morning',
+    body: "This is Hank's daughter. Since breakfast his words are coming out garbled and he can't grip his coffee mug with his right hand. The right corner of his mouth looks lower too. It started maybe an hour ago.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: true,
+    note: 'Acute speech change, unilateral weakness and facial droop are stroke signs; time-critical emergency.',
+  },
+  {
+    key: 'e04',
+    patientId: 'P12',
+    portalType: 'medical_question',
+    subject: 'not doing well',
+    body: "I keep thinking everyone would be better off without me. I've been looking up how many of my pills it would take. I don't know why I'm telling the portal this.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: true,
+    note: 'Passive suicidal ideation with method research is a self-harm red flag requiring immediate crisis outreach.',
+  },
+  {
+    key: 'e05',
+    patientId: 'P15',
+    portalType: 'medical_question',
+    subject: 'Heavy bleeding',
+    body: "I've been soaking through a pad every 30-40 minutes for the last 4 hours and passing big clots. I have the IUD. I feel really dizzy when I stand up and almost passed out in the bathroom.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: true,
+    note: 'Heavy uncontrolled bleeding with presyncope suggests hemodynamic compromise; emergency.',
+  },
+  {
+    key: 'e06',
+    patientId: 'P09',
+    portalType: 'medical_question',
+    subject: 'reaction to antibiotic?',
+    body: 'My lips are swelling and my throat feels tight after the new antibiotic urgent care gave me this afternoon. I also have hives on my chest. Should I stop taking it?',
+    expectedRoles: ['triage_rn'],
+    expectEmergency: true,
+    note: 'Lip swelling with throat tightness after a new drug is possible anaphylaxis even though it is phrased as a medication question.',
+  },
+
+  // ---------------------------------------------------------- multi-intent (4)
+  {
+    key: 'e07',
+    patientId: 'P01',
+    portalType: 'prescription_renewal',
+    subject: 'Atorvastatin and a bill',
+    body: "Please refill my atorvastatin 40 mg, I'm down to my last week. Also I got a bill for $30 from my October visit but I thought I paid my copay at the desk that day. Can someone check?",
+    expectedRoles: ['pharmacy', 'billing'],
+    expectEmergency: false,
+    note: 'Routine non-controlled refill goes to pharmacy; disputed visit charge goes to billing.',
+  },
+  {
+    key: 'e08',
+    patientId: 'P06',
+    portalType: 'medical_question',
+    subject: 'tramadol + appt',
+    body: "Could I get my tramadol renewed? I'll run out this weekend. And my follow up on Nov 13 needs to move, I'd like to come in after my MRI results are back, maybe the week after.",
+    expectedRoles: ['physician', 'front_desk'],
+    expectEmergency: false,
+    note: 'Tramadol is a controlled substance so the refill routes to the physician; rescheduling is front desk.',
+  },
+  {
+    key: 'e09',
+    patientId: 'P02',
+    portalType: 'medical_question',
+    subject: 'A1c and eye referral',
+    body: "Since my A1c went up to 8.1 should we be increasing my medicine or adding something before my next visit? Separate question: is the eye doctor referral still active? Nobody has called me.",
+    expectedRoles: ['physician', 'ma'],
+    expectEmergency: false,
+    note: 'Asking whether to change diabetes therapy based on A1c needs physician interpretation; referral status is MA.',
+  },
+  {
+    key: 'e10',
+    patientId: 'P05',
+    portalType: 'medical_question',
+    subject: 'FMLA and follow up',
+    body: "My employer needs the FMLA certification completed with how often I might need to be out for my anxiety. I uploaded it. Also, can I book a follow-up for early December? Any morning works.",
+    expectedRoles: ['ma', 'front_desk'],
+    expectEmergency: false,
+    note: 'FMLA certification requires clinical input so MA prepares it; booking a follow-up is front desk.',
+  },
+
+  // ---------------------------------------------------------- ambiguous (3)
+  {
+    key: 'e11',
+    patientId: 'P03',
+    portalType: 'medical_question',
+    subject: 'Call please',
+    body: 'Please have someone give me a call when you get a chance. Thanks.',
+    expectedRoles: ['triage_rn'],
+    expectEmergency: false,
+    note: 'No stated reason; vague messages go to triage RN to clarify and rule out a clinical concern.',
+  },
+  {
+    key: 'e12',
+    patientId: 'P13',
+    portalType: 'medical_question',
+    subject: 'again',
+    body: "It's back again. Same as before.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: false,
+    note: 'Unspecified recurring problem; triage RN should call to identify what has returned.',
+  },
+  {
+    key: 'e13',
+    patientId: 'P10',
+    portalType: 'medical_question',
+    subject: 'question',
+    body: "Not sure who to ask about this. Something's been off lately and I can't tell if it's worth an appointment.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: false,
+    note: 'Vague possibly-clinical concern without detail routes to triage RN.',
+  },
+
+  // ---------------------------------------------------------- refills (4)
+  {
+    key: 'e14',
+    patientId: 'P13',
+    portalType: 'prescription_renewal',
+    subject: 'Simvastatin',
+    body: 'Please renew my simvastatin 20 mg. I take it every evening. Same pharmacy. Thank you kindly.',
+    expectedRoles: ['pharmacy'],
+    expectEmergency: false,
+    note: 'Routine non-controlled chronic medication refill goes to pharmacy.',
+  },
+  {
+    key: 'e15',
+    patientId: 'P07',
+    portalType: 'medical_question',
+    subject: 'pill pack',
+    body: "Hi, I'm on my last pack of birth control and the pharmacy says I need a new prescription. Could you send a year's worth if that's allowed? No changes, no problems with it.",
+    expectedRoles: ['pharmacy'],
+    expectEmergency: false,
+    note: 'Routine oral contraceptive renewal with no new symptoms is a non-controlled refill for pharmacy despite the medical_question portal type.',
+  },
+  {
+    key: 'e16',
+    patientId: 'P04',
+    portalType: 'prescription_renewal',
+    subject: 'ADHD med',
+    body: "Hey, need the next month of my Concerta (methylphenidate ER 36) sent to the CVS by my apartment instead of the campus one. Thanks.",
+    expectedRoles: ['physician'],
+    expectEmergency: false,
+    note: 'Methylphenidate is a Schedule II controlled substance; refill requires the physician/APP.',
+  },
+  {
+    key: 'e17',
+    patientId: 'P05',
+    portalType: 'prescription_renewal',
+    subject: 'Xanax',
+    body: 'Requesting a refill of my alprazolam 0.5 mg as needed. Pharmacy said they need a new script.',
+    expectedRoles: ['physician'],
+    expectEmergency: false,
+    note: 'Alprazolam is a controlled benzodiazepine; refill decisions go to the prescriber.',
+  },
+
+  // ---------------------------------------------------------- scheduling (2)
+  {
+    key: 'e18',
+    patientId: 'P09',
+    portalType: 'appointment',
+    subject: 'Book physical',
+    body: 'Can I book my annual physical for sometime in December? I need it done before my program starts in January.',
+    expectedRoles: ['front_desk'],
+    expectEmergency: false,
+    note: 'Booking a preventive visit is a scheduling task for front desk.',
+  },
+  {
+    key: 'e19',
+    patientId: 'P11',
+    portalType: 'medical_question',
+    subject: 'Cancel Nov 9',
+    body: "I need to cancel my appointment on November 9. I'll call to rebook when my schedule settles down.",
+    expectedRoles: ['front_desk'],
+    expectEmergency: false,
+    note: 'Appointment cancellation is front desk even though sent as a medical question.',
+  },
+
+  // ---------------------------------------------------------- billing (2)
+  {
+    key: 'e20',
+    patientId: 'P13',
+    portalType: 'medical_question',
+    subject: 'Charged twice?',
+    body: 'My statement shows the October 2 visit listed two times with two separate charges. I think I was billed twice. Can you please look into it?',
+    expectedRoles: ['billing'],
+    expectEmergency: false,
+    note: 'Possible duplicate charge on a statement is a billing issue.',
+  },
+  {
+    key: 'e21',
+    patientId: 'P04',
+    portalType: 'medical_question',
+    subject: 'Insurance denied inhaler',
+    body: 'The pharmacy says my new insurance denied the Advair-type inhaler and it needs prior authorization. What do I need to do? I still have a few days left.',
+    expectedRoles: ['billing'],
+    expectEmergency: false,
+    note: 'Prior authorization / coverage denial is a billing_insurance item per clinic standard; patient is not out of medication.',
+  },
+
+  // ---------------------------------------------------------- forms / records (2)
+  {
+    key: 'e22',
+    patientId: 'P14',
+    portalType: 'medical_question',
+    subject: 'Vaccine record for camp',
+    body: 'Hola, Theo is going to winter camp and they need his vaccine record. Can you put it in the portal so I can print it? Gracias.',
+    expectedRoles: ['front_desk'],
+    expectEmergency: false,
+    note: 'Copy of immunization record is a records request handled by front desk.',
+  },
+  {
+    key: 'e23',
+    patientId: 'P12',
+    portalType: 'medical_question',
+    subject: 'Short-term disability form',
+    body: "My employer's short-term disability carrier sent a form that needs my diagnosis, treatment dates, and work restrictions filled in by the doctor. I uploaded it to the portal.",
+    expectedRoles: ['ma'],
+    expectEmergency: false,
+    note: 'Disability paperwork needing clinical details is prepared by the MA for physician signature.',
+  },
+
+  // ---------------------------------------------------------- referral (1)
+  {
+    key: 'e24',
+    patientId: 'P10',
+    portalType: 'medical_question',
+    subject: 'GI referral status',
+    body: "In August I was told I'd be referred to GI for a scope. It's almost November and I haven't heard from anyone. Can you check on it?",
+    expectedRoles: ['ma'],
+    expectEmergency: false,
+    note: 'Referral status follow-up is an MA task.',
+  },
+
+  // ---------------------------------------------------------- lab questions (3)
+  {
+    key: 'e25',
+    patientId: 'P01',
+    portalType: 'medical_question',
+    subject: 'Potassium result',
+    body: 'My potassium came back 4.1. Is that in the normal range? Just want to make sure since I take lisinopril.',
+    expectedRoles: ['ma'],
+    expectEmergency: false,
+    note: 'Routine question about an already-resulted normal value; MA can confirm per protocol.',
+  },
+  {
+    key: 'e26',
+    patientId: 'P03',
+    portalType: 'medical_question',
+    subject: 'Thyroid dose?',
+    body: 'My TSH came back low at 0.21. Does that mean my levothyroxine 100 mcg is too strong and I should go back down to 88?',
+    expectedRoles: ['physician'],
+    expectEmergency: false,
+    note: 'Abnormal TSH with a question about changing the dose requires physician interpretation and a treatment decision.',
+  },
+  {
+    key: 'e27',
+    patientId: 'P08',
+    portalType: 'medical_question',
+    subject: 'Kidney number and metformin',
+    body: "Hank's daughter here. His kidney function (eGFR) is down to 48 and his potassium was a little high. I read that metformin can be a problem with kidneys. Should he still be on it or on the lisinopril?",
+    expectedRoles: ['physician'],
+    expectEmergency: false,
+    note: 'Question about continuing metformin/ACE inhibitor given declining eGFR and high potassium needs physician medication review.',
+  },
+
+  // ---------------------------------------------------------- symptoms (2)
+  {
+    key: 'e28',
+    patientId: 'P15',
+    portalType: 'medical_question',
+    subject: 'burning again',
+    body: 'Burning when I pee and going every 20 minutes since yesterday. No fever, no back pain. Feels exactly like my last UTI. Can I drop off a urine sample?',
+    expectedRoles: ['triage_rn'],
+    expectEmergency: false,
+    note: 'New uncomplicated UTI symptoms without red flags go to triage RN for protocol-based assessment.',
+  },
+  {
+    key: 'e29',
+    patientId: 'P02',
+    portalType: 'medical_question',
+    subject: 'Feet tingling',
+    body: "The last month my feet have been tingling and kind of numb at night, worse than before. No sores that I can see. Is this the diabetes? It's making it hard to sleep.",
+    expectedRoles: ['triage_rn'],
+    expectEmergency: false,
+    note: 'Worsening non-emergency symptom (likely neuropathy) routes to triage RN.',
+  },
+
+  // ---------------------------------------------------------- general (1)
+  {
+    key: 'e30',
+    patientId: 'P07',
+    portalType: 'medical_question',
+    subject: 'Locked out',
+    body: 'I keep getting locked out of the portal on my phone app and the reset email never shows up. I had to log in on my laptop to send this. Can someone help?',
+    expectedRoles: ['front_desk'],
+    expectEmergency: false,
+    note: 'Portal password/access issue is a general admin question for front desk.',
+  },
+]

@@ -1,0 +1,10 @@
+node_modules
+dist
+.output
+.vinxi
+.tanstack
+.env
+.env.*
+!.env.example
+.netlify/*
+!.netlify/results.md
